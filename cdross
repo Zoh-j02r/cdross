@@ -1,0 +1,61 @@
+#!/bin/bash
+
+select_disto() {
+	distros=("melodic" "noetic" "foxy")
+	
+	for d in "${!distros[@]}"; do
+		if [ ${distros[$d]} == $1 ]; then
+			echo "FROM ros:${distros[$d]}-ros-base" >> Dockerfile
+			distro=$d
+			if ! [ "2" -gt "$d" ]; then
+				ros_version=2
+			fi
+			break
+		fi
+	done
+	if  [ -z "$distro" ]; then
+		echo "ERROR: distro not found"
+		rm Dockerfile
+		exit 1
+	fi
+}
+
+set_packages () {
+	echo "Currently these are the packages you can add to your container:"
+	echo " gazebo - install gazebo robot simualor"
+	echo " rviz - install 3D visualization tool"
+	#TODO: add more packages
+	packages="$@"
+	if [[ " ${packages[*]} " =~ " gazebo " ]]; then
+		echo ros-${distros[$distro]}-gazebo-ros-pkgs
+	fi
+	if [[ " ${packages[*]} " =~ " rviz " ]]; then
+		echo ros-${distros[$distro]}-rviz${ros_version}
+	fi
+	# this will me installed with packages built from source
+}
+
+set_user() {
+	# Set a user and directory with a specified name, if blank cdross and cdross-dir will be used instead
+	username=$1
+	homedir=$2
+	if  [ -z "$1" ]; then
+		homedir="cdross"
+	fi
+	if  [ -z "$2" ]; then
+		homedir="cdross-dir"
+	fi
+	echo 'RUN useradd --create-home --home-dir /home/'"$homedir"' --shell /bin/bash --user-group --groups sudo '"$username"' && \
+		    echo '"$username:$username"' | chpasswd && \
+		    echo "'"$username"' ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers' >> Dockerfile
+}
+source_shell () {
+	echo 'RUN echo "source /opt/ros/'"${distros[$distro]}"'/setup.sh" >> /home/'"$homedir"'/.bashrc'
+	#TODO: source completions features
+	#TODO: add zsh support
+}
+
+set_packages $*
+#Select_disto $1
+#Set_user cross
+#Source_shell
