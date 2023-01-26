@@ -1,11 +1,43 @@
 #!/bin/bash
+show_help() {
+	printf "\33[0;31m This is very early work script use at your own risk\033[0m\n"
+	echo "Usage: cdross [command] [args]"
+	echo " -i, --init <distro> <packages>		generate container file."
+	echo " -r, --run				start running cdross."
+	echo " -h, --help				show this message."
+	echo
+}
+
+cdross_init() {
+	printf "\033[0;36m # Select distro to be used: \033[0m\n"
+	select_disto
+	printf "\033[0;36m # Set the username for container: \033[0m\n"
+	set_user
+	printf "\033[0;36m # Set packages to be added to container image: \033[0m\n"
+	set_packages
+	printf "\033[0;36m # Sourcing variables \033[0m\n"
+	source_shell
+	printf "\033[0;32m # Container file created successfully \033[0m\n"
+}
+
+cdross_run() {
+	echo "not working yet"
+}
 
 select_disto() {
+	if [[ -e ./Dockerfile ]]; then
+		rm Dockerfile
+	fi
 	distros=("melodic" "noetic" "foxy")
-	
+	read selected_distro
+	if   [[ ! " ${distros[*]} " =~ " ${selected_distro} " ]]; then
+		printf "\033[0;31m ERROR:\033[0m distro not found\n"
+		exit 1
+	fi
 	for d in "${!distros[@]}"; do
-		if [ ${distros[$d]} == $1 ]; then
+		if [ ${distros[$d]} == $selected_distro ]; then
 			echo "FROM ros:${distros[$d]}-ros-base" >> Dockerfile
+			echo >> Dockerfile
 			distro=$d
 			if ! [ "2" -gt "$d" ]; then
 				ros_version=2
@@ -13,49 +45,52 @@ select_disto() {
 			break
 		fi
 	done
-	if  [ -z "$distro" ]; then
-		echo "ERROR: distro not found"
-		rm Dockerfile
-		exit 1
-	fi
 }
 
 set_packages () {
-	echo "Currently these are the packages you can add to your container:"
-	echo " gazebo - install gazebo robot simualor"
-	echo " rviz - install 3D visualization tool"
+	echo "currently these are the only options:"
+	echo " gazebo rviz "
 	#TODO: add more packages
-	packages="$@"
-	if [[ " ${packages[*]} " =~ " gazebo " ]]; then
-		echo ros-${distros[$distro]}-gazebo-ros-pkgs
+	read pack
+	if  [ -z "$pack" ]; then
+		echo "No package specified, base install will "
 	fi
-	if [[ " ${packages[*]} " =~ " rviz " ]]; then
-		echo ros-${distros[$distro]}-rviz${ros_version}
+	if [[ " ${pack[*]} " =~ " gazebo " ]]; then
+		packages=" ros-${distros[$distro]}-gazebo-ros-pkgs"
+	fi
+	if [[ " ${pack[*]} " =~ " rviz " ]]; then
+		aux_packages=" $packages ros-${distros[$distro]}-rviz${ros_version}"
 	fi
 	# this will me installed with packages built from source
 }
 
 set_user() {
-	# Set a user and directory with a specified name, if blank cdross and cdross-dir will be used instead
-	username=$1
-	homedir=$2
-	if  [ -z "$1" ]; then
-		homedir="cdross"
+	# Set a username to be used by cdross in container.
+	echo "Which username should container use?"
+	read username
+	if  [ -z "$username" ]; then
+		username="cdross"
+		echo "cdross name will be used instead"
 	fi
-	if  [ -z "$2" ]; then
-		homedir="cdross-dir"
-	fi
-	echo 'RUN useradd --create-home --home-dir /home/'"$homedir"' --shell /bin/bash --user-group --groups sudo '"$username"' && \
+	echo 'RUN useradd --create-home --home-dir /home/cross-dir --shell /bin/bash --user-group --groups sudo '"$username"' && \
 		    echo '"$username:$username"' | chpasswd && \
 		    echo "'"$username"' ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers' >> Dockerfile
+	echo >> Dockerfile
 }
 source_shell () {
-	echo 'RUN echo "source /opt/ros/'"${distros[$distro]}"'/setup.sh" >> /home/'"$homedir"'/.bashrc'
+	echo 'RUN echo "source /opt/ros/'"${distros[$distro]}"'/setup.sh" >> /home/'"$homedir"'/.bashrc' >> Dockerfile
 	#TODO: source completions features
 	#TODO: add zsh support
 }
 
-set_packages $*
-#Select_disto $1
-#Set_user cross
-#Source_shell
+case $1 in
+	'init')
+		cdross_init
+	;;
+	'run')
+		cdross_run
+	;;
+	'help' | *)
+		show_help
+	;;
+esac
