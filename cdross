@@ -12,9 +12,9 @@ cdross_init() {
 	printf "\033[0;36m # Select distro to be used: \033[0m\n"
 	select_disto
 	printf "\033[0;36m # Set the username for container: \033[0m\n"
-	set_user
-	printf "\033[0;36m # Set packages to be added to container image: \033[0m\n"
 	set_packages
+	printf "\033[0;36m # Set packages to be added to container image: \033[0m\n"
+	set_user
 	printf "\033[0;36m # Sourcing variables \033[0m\n"
 	source_shell
 	printf "\033[0;32m # Container file created successfully \033[0m\n"
@@ -25,8 +25,8 @@ cdross_run() {
 }
 
 select_disto() {
-	if [[ -e ./Dockerfile ]]; then
-		rm Dockerfile
+	if [[ -e current/Dockerfile ]]; then
+		rm current/Dockerfile
 	fi
 	distros=("melodic" "noetic" "foxy")
 	read selected_distro
@@ -36,8 +36,7 @@ select_disto() {
 	fi
 	for d in "${!distros[@]}"; do
 		if [ ${distros[$d]} == $selected_distro ]; then
-			echo "FROM ros:${distros[$d]}-ros-base" >> Dockerfile
-			echo >> Dockerfile
+			echo "FROM ros:${distros[$d]}-ros-base" >> current/Dockerfile
 			distro=$d
 			if ! [ "2" -gt "$d" ]; then
 				ros_version=2
@@ -48,6 +47,7 @@ select_disto() {
 }
 
 set_packages () {
+	echo "RUN apt update && apt install libgl1-mesa-glx libgl1-mesa-dri \\" >> current/Dockerfile
 	echo "currently these are the only options:"
 	echo " gazebo rviz "
 	#TODO: add more packages
@@ -56,11 +56,14 @@ set_packages () {
 		echo "No package specified, base install will "
 	fi
 	if [[ " ${pack[*]} " =~ " gazebo " ]]; then
-		packages=" ros-${distros[$distro]}-gazebo-ros-pkgs"
+		packages="ros-${distros[$distro]}-gazebo-ros-pkgs"
+		echo "	$packages \\" >> current/Dockerfile
 	fi
 	if [[ " ${pack[*]} " =~ " rviz " ]]; then
-		aux_packages=" $packages ros-${distros[$distro]}-rviz${ros_version}"
+		aux_packages="$packages ros-${distros[$distro]}-rviz${ros_version}"
+		echo "	$aux_packages \\" >> current/Dockerfile
 	fi
+	echo "	sudo" >>  current/Dockerfile
 	# this will me installed with packages built from source
 }
 
@@ -72,15 +75,12 @@ set_user() {
 		username="cdross"
 		echo "cdross name will be used instead"
 	fi
-	echo 'RUN useradd --create-home --home-dir /home/cross-dir --shell /bin/bash --user-group --groups sudo '"$username"' && \
-		    echo '"$username:$username"' | chpasswd && \
-		    echo "'"$username"' ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers' >> Dockerfile
-	echo >> Dockerfile
+	echo 'RUN useradd --create-home --home-dir /home/cdross-dir --shell /bin/bash --user-group --groups sudo '"$username"' && \
+	echo '"$username:$username"' | chpasswd && \
+	echo "'"$username"' ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers' >> current/Dockerfile
 }
 source_shell () {
-	echo 'RUN echo "source /opt/ros/'"${distros[$distro]}"'/setup.sh" >> /home/'"$homedir"'/.bashrc' >> Dockerfile
-	#TODO: source completions features
-	#TODO: add zsh support
+	echo 'RUN echo "source /opt/ros/'"${distros[$distro]}"'/setup.sh" >> /home/cdross-dir/.bashrc' >> current/Dockerfile
 }
 
 case $1 in
