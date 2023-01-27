@@ -9,7 +9,7 @@ show_help() {
 }
 
 cdross_init() {
-	printf "\033[0;36m # Select distro to be used: \033[0m\n"
+	printf "\033[0;36m # Select distro to be used:"
 	select_disto
 	printf "\033[0;36m # Set the username for container: \033[0m\n"
 	set_packages
@@ -21,7 +21,19 @@ cdross_init() {
 }
 
 cdross_run() {
-	echo "not working yet"
+	printf "\033[0;34m starting cdross container \033[0m\n"
+	# in futures releases direct acess will not be permitted
+	docker run  --name cdross --rm -it -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY \
+	-e WAYLAND_DISPLAY=$WAYLAND_DISPLAY --device=/dev/dri/card0:/dev/dri/card0 \
+	cdross 
+	#--device=/dev/dri/renderD128:/dev/dri/renderD128 
+
+}
+
+cdross_exec() {
+	 #sudo docker exec --user cross -it cdross bash -c source /opt/ros/foxy/setup.sh && ros2
+	app="gazebo"
+	docker exec -it cdross $app 
 }
 
 select_disto() {
@@ -50,7 +62,7 @@ set_packages () {
 	echo "RUN apt update && apt install libgl1-mesa-glx libgl1-mesa-dri \\" >> current/Dockerfile
 	echo "currently these are the only options:"
 	echo " gazebo rviz "
-	#TODO: add more packages
+	#TODO: add more packages (demos)
 	read pack
 	if  [ -z "$pack" ]; then
 		echo "No package specified, base install will "
@@ -64,7 +76,7 @@ set_packages () {
 		echo "	$aux_packages \\" >> current/Dockerfile
 	fi
 	echo "	sudo" >>  current/Dockerfile
-	# this will me installed with packages built from source
+	# This will me installed with packages built from source
 }
 
 set_user() {
@@ -89,6 +101,9 @@ case $1 in
 	;;
 	'run')
 		cdross_run
+	;;
+	'exec')
+		cdross_exec
 	;;
 	'help' | *)
 		show_help
